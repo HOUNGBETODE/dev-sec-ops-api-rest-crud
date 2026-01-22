@@ -1,16 +1,19 @@
 # main.py
+import uvicorn
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Enum as SQLEnum
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional, List
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 import enum
 from math import radians, cos, sin, asin, sqrt
+
+
 
 # Configuration
 SECRET_KEY = "votre_secret_key_super_securisee_a_changer"
@@ -180,8 +183,7 @@ class UserResponse(BaseModel):
     is_verified: bool
     business_name: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CategoryCreate(BaseModel):
     name: str
@@ -192,8 +194,7 @@ class CategoryResponse(BaseModel):
     name: str
     description: Optional[str] = None
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class ProductCreate(BaseModel):
     name: str
@@ -221,8 +222,7 @@ class ProductResponse(BaseModel):
     category_id: int
     vendor_id: int
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class CartItemCreate(BaseModel):
     product_id: int
@@ -234,8 +234,7 @@ class CartItemResponse(BaseModel):
     quantity: int
     product: ProductResponse
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 class OrderCreate(BaseModel):
     session_id: str
@@ -254,8 +253,7 @@ class OrderResponse(BaseModel):
     status: OrderStatus
     created_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 # ==================== DEPENDENCIES ====================
 def get_db():
