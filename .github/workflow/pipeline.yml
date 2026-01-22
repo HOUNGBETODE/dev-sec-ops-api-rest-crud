@@ -1,0 +1,334 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  branch-name-policy:
+    name: branch-name-policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR source branch name
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BRANCH="${{ github.head_ref }}"
+          else
+            BRANCH="${{ github.ref_name }}"
+          fi
+          echo "PR head ref: $BRANCH"
+          if [[ "$BRANCH" =~ ^(release/|hotfix/|feature/|bugfix/|test|main|dev).* ]]; then
+            echo "Allowed branch pattern: $BRANCH"
+            exit 0
+          else
+            echo "::error ::Branch name '$BRANCH' is not allowed to merge into main. Allowed patterns: release/*, hotfix/*, feature/*, bugfix/*, test*"
+            exit 1
+          fi
+  
+  sast-analysis:
+    name: Security Analysis (SAST)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install Bandit
+        run: pip install bandit bandit[toml] bandit[sarif]
+
+      - name: Run Bandit Security Scan
+        run: |
+          bandit -r . -f sarif -o bandit-report.sarif || true
+          bandit -r . -f json -o bandit-report.json || true
+
+      - name: Upload Bandit SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit-report.sarif
+          category: bandit
+
+      - name: Upload Bandit Report as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: |
+            bandit-report.sarif
+            bandit-report.json
+
+      - name: Run Semgrep SAST Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+            p/ci
+          generateSarif: true
+        env:
+          SEMGREP_TIMEOUT: 300
+
+      - name: Upload Semgrep SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Upload Semgrep Report as Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: semgrep-report
+          path: semgrep.sarif
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/python@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --sarif-file-output=snyk-report.sarif --severity-threshold=medium
+
+      - name: Upload Snyk SARIF Report
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: snyk-report.sarif
+          category: snyk
+
+      - name: Upload Snyk Report as Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-report
+          path: snyk-report.sarif
+
+      - name: SonarQube Scan
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+            -Dsonar.python.version=3.11
+            -Dsonar.sources=.
+            -Dsonar.exclusions=**/*test*/**,**/__pycache__/**,**/venv/**,**/node_modules/**
+            -Dsonar.python.bandit.reportPaths=bandit-report.json
+
+      - name: SonarQube Quality Gate Check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
+      - name: Generate SAST Summary Report
+        if: always()
+        run: |
+          echo "# 🔒 SAST Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Analysis Tools Run:" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bandit (Python security)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Semgrep (Multi-language SAST)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Snyk (Dependency & code security)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SonarQube (Code quality & security)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 View detailed reports in the artifacts section." >> $GITHUB_STEP_SUMMARY
+
+  # deploy:
+  #   name: Deploy to Production
+  #   needs: sast-analysis
+  #   runs-on: ubuntu-latest
+
+  #   env:
+  #     LOG_FILE: deploy.log
+  #     APP_PATH: ${{ secrets.APP_PATH }}
+  #     SERVER_NAME: ${{ secrets.SERVER_NAME }}
+  #     SERVER_HOST: ${{ secrets.SERVER_HOST }}
+  #     SERVER_USER: ${{ secrets.SERVER_USER }}
+  #     HEALTHCHECK_URL: ${{ secrets.HEALTHCHECK_URL }}
+
+  #   steps:
+  #     - name: Checkout repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Setup SSH
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+  #         chmod 600 ~/.ssh/id_rsa
+  #         ssh-keyscan $SERVER_HOST >> ~/.ssh/known_hosts
+      
+  #     - name: Deploy to production server
+  #       id: deploy
+  #       run: |
+  #         set -e
+  #         echo "🚀 Deploying to $SERVER_NAME ($SERVER_HOST)" | tee $LOG_FILE
+
+  #         ssh $SERVER_USER@$SERVER_HOST << 'EOF' | tee -a $LOG_FILE
+  #           set -e
+  #           echo "📍 Server: $SERVER_HOST"
+  #           echo "📂 Path: $APP_PATH"
+
+  #           cd $APP_PATH
+
+  #           PREVIOUS_COMMIT=$(git rev-parse HEAD)
+  #           echo "$PREVIOUS_COMMIT" > .previous_commit
+
+  #           echo "🔄 Pulling latest main branch..."
+  #           git fetch origin
+  #           git reset --hard origin/main
+
+  #           echo "✅ Deploy completed"
+  #         EOF
+
+  #     - name: Post-deploy Healthcheck
+  #       id: healthcheck
+  #       run: |
+  #         echo "❤️ Healthcheck on $HEALTHCHECK_URL" | tee -a $LOG_FILE
+
+  #         for i in {1..10}; do
+  #           STATUS=$(curl -s -o /dev/null -w "%{http_code}" $HEALTHCHECK_URL || true)
+  #           if [ "$STATUS" = "200" ]; then
+  #             echo "✅ Healthcheck OK (HTTP 200)" | tee -a $LOG_FILE
+  #             exit 0
+  #           fi
+  #           echo "⏳ Healthcheck failed (status=$STATUS), retry $i/10" | tee -a $LOG_FILE
+  #           sleep 5
+  #         done
+
+  #         echo "❌ Healthcheck failed after deploy" | tee -a $LOG_FILE
+  #         exit 1
+
+  #     - name: Rollback to previous version
+  #       if: failure()
+  #       run: |
+  #         echo "🔄 Rollback initiated on $SERVER_NAME" | tee -a $LOG_FILE
+
+  #         ssh $SERVER_USER@$SERVER_HOST << 'EOF' | tee -a $LOG_FILE
+  #           set -e
+  #           cd $APP_PATH
+
+  #           if [ -f .previous_commit ]; then
+  #             ROLLBACK_COMMIT=$(cat .previous_commit)
+  #             git reset --hard $ROLLBACK_COMMIT
+  #             echo "✅ Rollback to $ROLLBACK_COMMIT completed"
+  #           else
+  #             echo "❌ No rollback commit found"
+  #             exit 1
+  #           fi
+  #         EOF
+
+  #     - name: Extract deployment log summary
+  #       id: log_summary
+  #       if: always()
+  #       run: |
+  #         if [ -f "$LOG_FILE" ]; then
+  #           echo "log_summary<<EOF" >> $GITHUB_OUTPUT
+  #           tail -n 30 $LOG_FILE >> $GITHUB_OUTPUT
+  #           echo "EOF" >> $GITHUB_OUTPUT
+  #         else
+  #           echo "log_summary=No log file found" >> $GITHUB_OUTPUT
+  #         fi
+
+      # - name: Notify Discord (Success)
+      #   if: success()
+      #   uses: tsickert/discord-webhook@v7.0.0
+      #   with:
+      #     webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      #     embed-title: "🚀 Déploiement réussi"
+      #     embed-color: 3066993
+      #     embed-description: |
+      #       **Server:** ${{ env.SERVER_NAME }}
+      #       **Host:** ${{ env.SERVER_HOST }}
+      #       **Branch:** ${{ github.ref }}
+      #       **Commit:** `${{ github.sha }}`
+      #       **Action:** Standard Deploy
+      #       **Healthcheck:** Healthy ✅
+
+      # - name: Notify Discord (Failure / Rollback)
+      #   if: failure()
+      #   uses: tsickert/discord-webhook@v7.0.0
+      #   with:
+      #     webhook-url: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      #     embed-title: "⚠️ Déploiement échoué — Rollback effectué"
+      #     embed-color: 15158332
+      #     embed-description: |
+      #       **Server:** ${{ env.SERVER_NAME }}
+      #       **Host:** ${{ env.SERVER_HOST }}
+      #       **Branch:** ${{ github.ref }}
+      #       **Failed Commit:** `${{ github.sha }}`
+      #       **Action:** Rollback to previous version
+      #       **Healthcheck:** Failed ❌
+
+      #       ${{ steps.log_summary.outputs.log_summary }}
+
+      # - name: Notify Email (Success)
+      #   if: success()
+      #   uses: dawidd6/action-send-mail@v4
+      #   with:
+      #     server_address: ${{ secrets.SMTP_SERVER }}
+      #     server_port: 587
+      #     secure: false
+      #     username: ${{ secrets.SMTP_USERNAME }}
+      #     password: ${{ secrets.SMTP_PASSWORD }}
+      #     to: ${{ secrets.EMAIL_TO_LIST }}
+      #     from: "GitHub Actions - CD <no-reply@github.com>"
+      #     subject: "✅ Déploiement réussi — Production"
+      #     body: |
+      #       Le déploiement en production a réussi.
+
+      #       Server: ${{ env.SERVER_NAME }}
+      #       Host: ${{ env.SERVER_HOST }}
+      #       Branch: ${{ github.ref }}
+      #       Commit: ${{ github.sha }}
+      #       Action: Déploiement standard
+      #       Healthcheck: OK ✅
+
+      # - name: Notify Email (Failure / Rollback)
+      #   if: failure()
+      #   uses: dawidd6/action-send-mail@v4
+      #   with:
+      #     server_address: ${{ secrets.SMTP_SERVER }}
+      #     server_port: 587
+      #     secure: false
+      #     username: ${{ secrets.SMTP_USERNAME }}
+      #     password: ${{ secrets.SMTP_PASSWORD }}
+      #     to: ${{ secrets.EMAIL_TO_LIST }}
+      #     from: "GitHub Actions - CD <no-reply@github.com>"
+      #     subject: "⚠️ Échec du déploiement — Rollback effectué"
+      #     body: |
+      #       ⚠️ Le déploiement en production a échoué.
+      #       Un rollback automatique a été effectué.
+
+      #       Server: ${{ env.SERVER_NAME }}
+      #       Host: ${{ env.SERVER_HOST }}
+      #       Branch: ${{ github.ref }}
+      #       Commit en échec: ${{ github.sha }}
+      #       Action: Rollback automatique
+      #       Healthcheck: FAILED ❌
+
+      #       ${{ steps.log_summary.outputs.log_summary }}
+
+      #       Merci de consulter les logs GitHub Actions pour plus de détails.
+
+      # - name: Cleanup sensitive files
+      #   if: always()
+      #   run: |
+      #     rm -f ~/.ssh/id_rsa
+      #     echo "Clé SSH et fichiers sensibles supprimés"
+
