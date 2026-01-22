@@ -1,5 +1,9 @@
 name: Deploy to Production
 
+permissions:
+  contents: read
+  security-events: write
+
 on:
   push:
     branches:
@@ -51,8 +55,8 @@ jobs:
 
       - name: Run Bandit Security Scan
         run: |
-          bandit -r . -f sarif -o bandit-report.sarif || true
-          bandit -r . -f json -o bandit-report.json || true
+          bandit -r . -f sarif -o bandit-report.sarif
+          bandit -r . -f json -o bandit-report.json
 
       - name: Upload Bandit SARIF Report
         uses: github/codeql-action/upload-sarif@v3
