@@ -42,7 +42,7 @@ jobs:
             -
                 name: Build Docker Image
                 run: |
-                    docker build ./Dockerfile -t dev-sec-ops/api-rest-crud
+                    docker build Dockerfile -t dev-sec-ops/api-rest-crud
             
             - 
                 name: Run Docker Container

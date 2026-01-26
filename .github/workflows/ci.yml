@@ -58,6 +58,16 @@ jobs:
                 name: Install Bandit & Pylint
                 run: pip install pylint bandit bandit[toml] bandit[sarif]
 
+            - 
+                name: Install requirements.txt packages
+                run: pip install -r requirements.txt
+
+            - 
+                name: Run Bandit Security Scan
+                run: |
+                    PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
+                    bandit -r $PYTHON_FILES
+
             -
                 name: Run Pylint Code Scan
                 run: |
@@ -67,12 +77,6 @@ jobs:
                     else
                         echo "No python files retrieved"
                     fi
-
-            - 
-                name: Run Bandit Security Scan
-                run: |
-                    PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
-                    bandit -r $PYTHON_FILES
 
             - 
                 name: Get Bandit Security Scan Report
