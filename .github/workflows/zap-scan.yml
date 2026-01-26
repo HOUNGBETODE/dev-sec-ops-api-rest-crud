@@ -55,7 +55,7 @@ jobs:
             
             - 
                 name: Pull ZAP OWASP Image
-                run: docker pull owasp/zap2docker-weekly
+                run: docker pull zaproxy/zap-weekly
 
             - 
                 name: Run ZAP API Scan
