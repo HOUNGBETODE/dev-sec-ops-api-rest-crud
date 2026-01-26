@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict
 import enum
+import os
 from dotenv import load_dotenv
 from math import radians, cos, sin, asin, sqrt
 
