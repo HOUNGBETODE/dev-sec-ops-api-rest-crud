@@ -9,17 +9,20 @@ from datetime import datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict
 import enum
+from dotenv import load_dotenv
 from math import radians, cos, sin, asin, sqrt
 
 
+load_dotenv()
+
 
 # Configuration
-SECRET_KEY = "votre_secret_key_super_securisee_a_changer"
+SECRET_KEY = os.environ.get("SECRET_KEY", None)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 # Database setup
-SQLALCHEMY_DATABASE_URL = "sqlite:///./ecommerce.db"
+SQLALCHEMY_DATABASE_URL = os.environ.get("SQLALCHEMY_DATABASE_URL", None)
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
