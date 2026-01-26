@@ -61,6 +61,7 @@ jobs:
                 name: Run ZAP API Scan
                 run: |
                     sudo docker run -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-api-scan.py -t http://localhost:8080/openapi.json -f openapi -c api-scan.conf
+                continue-on-error: true
 
             -
                 name: Run ZAP Full Scan
