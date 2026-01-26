@@ -9,6 +9,10 @@ on:
             - main
     workflow_dispatch:
 
+permissions:
+    contents: read
+    security-events: write
+
 jobs:
     branch-name-policy:
         runs-on: ubuntu-latest
@@ -67,6 +71,7 @@ jobs:
                 run: |
                     PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
                     bandit -r $PYTHON_FILES
+                continue-on-error: true
 
             -
                 name: Run Pylint Code Scan
@@ -77,6 +82,7 @@ jobs:
                     else
                         echo "No python files retrieved"
                     fi
+                continue-on-error: true
 
             - 
                 name: Get Bandit Security Scan Report

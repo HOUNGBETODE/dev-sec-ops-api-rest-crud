@@ -13,6 +13,10 @@ on:
         workflows: ["ci.yml"]
         types: [completed]
 
+permissions:
+    contents: read
+    security-events: write
+
 jobs:
     zap-api-scan:
         runs-on: ubuntu-latest
@@ -42,7 +46,7 @@ jobs:
             -
                 name: Build Docker Image
                 run: |
-                    docker build Dockerfile -t dev-sec-ops/api-rest-crud
+                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud .
             
             - 
                 name: Run Docker Container

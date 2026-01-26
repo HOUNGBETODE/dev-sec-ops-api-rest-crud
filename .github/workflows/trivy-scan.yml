@@ -69,7 +69,7 @@ jobs:
             -
                 name: Build an image from Dockerfile
                 run: |
-                    docker build Dockerfile -t dev-sec-ops/api-rest-crud-${{ github.sha }}:latest
+                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud-${{ github.sha }}:latest .
             
             - 
                 name: Run TVS in sarif format

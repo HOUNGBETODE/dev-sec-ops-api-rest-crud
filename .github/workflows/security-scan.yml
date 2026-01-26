@@ -1,4 +1,4 @@
-name: Build and Deploy (CD pipeline)
+name: Checkout and Report Summary (CD pipeline)
 
 permissions:
     contents: read
