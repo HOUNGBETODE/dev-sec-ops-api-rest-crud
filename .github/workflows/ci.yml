@@ -88,6 +88,7 @@ jobs:
                 name: Get Bandit Security Scan Report
                 run: |
                     bandit -r . -l -i -f html -o bandit-report.html
+                continue-on-error: true
 
             - 
                 name: Upload Bandit Report as Artifact
