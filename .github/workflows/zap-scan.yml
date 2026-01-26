@@ -30,18 +30,18 @@ jobs:
             - 
                 name: Create api-scan.conf file with full configuration
                 run: |
-                    echo "scan.policy=default" > api-scan.conf
-                    echo "url.baseurl=http://localhost:8080" >> api-scan.conf
-                    echo "url.target=http://localhost:8080/openapi.json" >> api-scan.conf
-                    echo "rule.sql_injection=true" >> api-scan.conf
-                    echo "rule.xss=true" >> api-scan.conf
-                    echo "scan.verbose=true" >> api-scan.conf
-                    echo "scan.delay=500" >> api-scan.conf
-                    echo "scan.timeout=120" >> api-scan.conf
-                    echo "scan.maxDepth=5" >> api-scan.conf
-                    echo "scan.ajaxSpider=true" >> api-scan.conf
-                    echo "scan.authentication=true" >> api-scan.conf
-                    echo "scan.alertFilter=medium,high" >> api-scan.conf
+                    echo -e "scan.policy\tdefault" > api-scan.conf
+                    echo -e "url.baseurl\thttp://localhost:8080" >> api-scan.conf
+                    echo -e "url.target\thttp://localhost:8080/openapi.json" >> api-scan.conf
+                    echo -e "rule.sql_injection\ttrue" >> api-scan.conf
+                    echo -e "rule.xss\ttrue" >> api-scan.conf
+                    echo -e "scan.verbose\ttrue" >> api-scan.conf
+                    echo -e "scan.delay\t500" >> api-scan.conf
+                    echo -e "scan.timeout\t120" >> api-scan.conf
+                    echo -e "scan.maxDepth\t5" >> api-scan.conf
+                    echo -e "scan.ajaxSpider\ttrue" >> api-scan.conf
+                    echo -e "scan.authentication\ttrue" >> api-scan.conf
+                    echo -e "scan.alertFilter\tmedium,high" >> api-scan.conf
 
             -
                 name: Build Docker Image
