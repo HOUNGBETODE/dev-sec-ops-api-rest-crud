@@ -1,0 +1,89 @@
+name: Continuous Test & Security Checks Integration (CI pipeline)
+
+on:
+    push:
+        branches:
+            - '**'
+    pull_request:
+        branches:
+            - main
+    workflow_dispatch:
+
+jobs:
+    branch-name-policy:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Check PR source branch name
+                shell: bash
+                run: |
+                    if [ "${{ github.event_name }}" = "pull_request" ]; then
+                        BRANCH="${{ github.head_ref }}"
+                    else
+                        BRANCH="${{ github.ref_name }}"
+                    fi
+                    echo "PR head ref: $BRANCH"
+                    if [[ "$BRANCH" =~ ^(release/|hotfix/|feature/|bugfix/|test|main|dev).* ]]; then
+                        echo "Allowed branch pattern: $BRANCH"
+                        exit 0
+                    else
+                        echo "::error ::Branch name '$BRANCH' is not allowed to merge into main. Allowed patterns: release/*, hotfix/*, feature/*, bugfix/*, test*"
+                        exit 1
+                    fi
+
+    python-code-scanning:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Checkout repository
+                uses: actions/checkout@v4
+                with:
+                    fetch-depth: 0
+
+            -
+                name: Retrieve PYTHON Files
+                id: retrieve-files
+                run: |
+                    PYTHON_FILES=$(find . -type f -name "*.py" | tr '\n' ' ')
+                    echo "Retrieved PYTHON files: $PYTHON_FILES"
+                    echo "python-files=$PYTHON_FILES" >> $GITHUB_OUTPUT
+
+            - 
+                name: Set up Python
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.11'
+            
+            - 
+                name: Install Bandit & Pylint
+                run: pip install pylint bandit bandit[toml] bandit[sarif]
+
+            -
+                name: Run Pylint Code Scan
+                run: |
+                    PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
+                    if [ -n "$PYTHON_FILES" ]; then
+                        pylint $PYTHON_FILES
+                    else
+                        echo "No python files retrieved"
+                    fi
+
+            - 
+                name: Run Bandit Security Scan
+                run: |
+                    PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
+                    bandit -r $PYTHON_FILES
+
+            - 
+                name: Get Bandit Security Scan Report
+                run: |
+                    bandit -r . -l -i -f html -o bandit-report.html
+
+            - 
+                name: Upload Bandit Report as Artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: bandit-report
+                    path: |
+                        bandit-report.html
+
