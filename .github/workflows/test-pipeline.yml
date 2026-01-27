@@ -40,12 +40,23 @@ jobs:
                     image-tag: latest
                     # min-high-cves-to-fail: "1"
                     # min-medium-cves-to-fail: "1"
-            
-            -
-                name: Scan Image with Docker Scout
-                uses: docker/scout-action@v1
+
+            - 
+                name: Scan Image with Trivy in table format
+                uses: aquasecurity/trivy-action@0.33.1
                 with:
-                    command: cves,recommendations,sbom
-                    image: dev-sec-ops/api-rest-crud-${{ github.sha }}:latest
+                    image-ref: 'dev-sec-ops/api-rest-crud-${{ github.sha }}:latest'
+                    format: 'table'
+                    # exit-code: '1'
+                    # ignore-unfixed: true
+                    vuln-type: 'os,library'
+                    severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+            
+            # -
+            #     name: Scan Image with Docker Scout
+            #     uses: docker/scout-action@v1
+            #     with:
+            #         command: cves,recommendations,sbom
+            #         image: dev-sec-ops/api-rest-crud-${{ github.sha }}:latest
 
 # grype
