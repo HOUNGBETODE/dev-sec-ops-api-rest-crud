@@ -1,6 +1,6 @@
-FROM python:3.14-slim
+FROM python:3.14-alpine
 
-RUN apt-get update && apt-get upgrade -y
+# RUN apt-get update && apt-get upgrade -y
 
 RUN useradd -m devops
 RUN mkdir -p /usr/src/app && chown -R devops:devops /usr/src/app
