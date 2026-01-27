@@ -38,8 +38,8 @@ jobs:
                 with:
                     image-repository: dev-sec-ops/api-rest-crud-${{ github.sha }}
                     image-tag: latest
-                    # min-high-cves-to-fail: "1"
-                    # min-medium-cves-to-fail: "1"
+                    min-high-cves-to-fail: "1"
+                    min-medium-cves-to-fail: "1"
 
             - 
                 name: Scan Image with Trivy in table format
@@ -47,21 +47,27 @@ jobs:
                 with:
                     image-ref: 'dev-sec-ops/api-rest-crud-${{ github.sha }}:latest'
                     format: 'table'
-                    # exit-code: '1'
-                    # ignore-unfixed: true
+                    exit-code: '1'
+                    ignore-unfixed: true
                     vuln-type: 'os,library'
                     severity: 'CRITICAL,HIGH,MEDIUM,LOW'
             
             -
                 name: Scan Image with Docker Scout
-                run: |
-                    curl -fsSL https://raw.githubusercontent.com/docker/scout-cli/main/install.sh -o install-scout.sh
-                    sh install-scout.sh
-
-                    echo ${{ secrets.DOCKER_PASSWORD }} | docker login -u ${{ secrets.DOCKER_USER }} --password-stdin
-
-                    docker scout quickview
-                    docker scout cves
-                    docker scout recommendations
+                uses: docker/scout-action@v1.18.2
+                with:
+                    dockerhub-user: ${{ secrets.DOCKER_USER }}
+                    dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+                    command: quickview,cves,recommendations
+                    sarif-file: docker-scout-report.sarif
+                    exit-code: true
+            
+            - 
+                name: Upload Docker Scout Report as Artifact
+                uses: actions/upload-artifact@v6
+                with:
+                    name: docker-scout-findings
+                    path: |
+                        docker-scout-report.sarif
 
 # grype
