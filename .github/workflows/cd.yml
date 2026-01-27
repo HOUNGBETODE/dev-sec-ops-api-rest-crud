@@ -35,6 +35,13 @@ jobs:
                     echo "${{ secrets.GITHUB_TOKEN }}" | \
                     docker login ghcr.io -u ${{ github.actor }} --password-stdin
             
+            -
+                name: Swapcase repository owner name
+                id: string
+                uses: ASzc/change-string-case-action@v1
+                with:
+                    string: ${{ github.repository_owner }}
+
             - 
                 name: Build and push Docker image
                 uses: docker/build-push-action@v5
@@ -42,13 +49,10 @@ jobs:
                     context: .
                     file: Dockerfile
                     push: true
-                    # tags: |
-                    #     ghcr.io/${{ lower(github.repository_owner) }}/spm:latest
-                    #     ghcr.io/${{ lower(github.repository_owner) }}/spm:${{ github.sha }}
                     tags: |
-                        ghcr.io/dev-sec-ops-proj-incub/spm:latest
-                        ghcr.io/dev-sec-ops-proj-incub/spm:${{ github.sha }}
-
+                        ghcr.io/${{ steps.string.outputs.lowercase }}/spm:latest
+                        ghcr.io/${{ steps.string.outputs.lowercase }}/spm:${{ github.sha }}
+    
     deploy-to-render:
         runs-on: ubuntu-latest
         env:
