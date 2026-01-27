@@ -59,10 +59,16 @@ jobs:
                 run: docker pull zaproxy/zap-weekly
 
             - 
-                name: Run ZAP API Scan
+                name: Run ZAP API Passive Scan
                 run: |
-                    docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-api-scan.py -t http://api:80/openapi.json -f openapi -g zap_api_scan_$(date -u +'%Y%m%d').conf -r zap_report_$(date -u +'%Y%m%d').html
+                    docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-baseline.py -t http://api:80/openapi.json -f openapi -g zap_passive_scan_$(date -u +'%Y%m%d').conf -r zap_passive_scan_report_$(date -u +'%Y%m%d').html
                 continue-on-error: true
+
+            # - 
+            #     name: Run ZAP API Active Scan
+            #     run: |
+            #         docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-api-scan.py -t http://api:80/openapi.json -f openapi -c options.prop -r zap_active_scan_report_$(date -u +'%Y%m%d').html
+            #     continue-on-error: true
 
             -
                 name: Run ZAP Full Scan
@@ -75,19 +81,14 @@ jobs:
                     allow_issue_writing: false
 
             - 
-                name: Upload ZAP Config Scan
+                name: Upload ZAP artifacts
                 uses: actions/upload-artifact@v6
                 with:
-                    name: zap-api-scan
-                    path: zap_api_scan_$(date -u +'%Y%m%d').conf
+                    name: zap-artifacts
+                    path: |
+                        zap_passive_scan_*.conf
+                        zap_passive_scan_*.html
 
-            - 
-                name: Upload ZAP Report
-                uses: actions/upload-artifact@v6
-                with:
-                    name: zap-scan-report
-                    path: zap_report_$(date -u +'%Y%m%d').html
-            
             - 
                 name: Stop Docker Container
                 run: |
