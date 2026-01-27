@@ -94,7 +94,7 @@ jobs:
                 name: Upload Bandit Report as Artifact
                 uses: actions/upload-artifact@v4
                 with:
-                    name: bandit-report
+                    name: bandit-findings
                     path: |
                         bandit-report.html
 
