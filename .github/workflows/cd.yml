@@ -2,7 +2,6 @@ name: Build and Deploy (CD pipeline)
 
 permissions:
     contents: read
-    packages: write
 
 on:
     push:
@@ -19,6 +18,8 @@ on:
 jobs:
     build-image:
         runs-on: ubuntu-latest
+        permissions:
+            packages: write
         if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         steps:
             -
@@ -54,39 +55,34 @@ jobs:
                         ghcr.io/${{ steps.string.outputs.lowercase }}/spm:${{ github.sha }}
     
     deploy-to-render:
+        needs: build-image
         runs-on: ubuntu-latest
+        permissions:
+            deployments: write
         env:
             LOG_FILE: deploy.log
             RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
             RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
             SERVER_NAME: ${{ secrets.SERVER_NAME }}
             DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
         steps:
             - 
                 name: Checkout code
                 uses: actions/checkout@v4
 
-            -
-                name: Build an image from Dockerfile
-                run: |
-                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud .
-
-            - 
-                name: Log in to Render Docker registry
-                run: echo $RENDER_API_KEY | docker login -u render --password-stdin registry.render.com
-
-            - 
-                name: Push Docker image to Render
-                run: |
-                    docker tag dev-sec-ops/api-rest-crud registry.render.com/${{ secrets.RENDER_SERVICE_ID }}/dev-sec-ops/api-rest-crud:latest
-                    docker push registry.render.com/${{ secrets.RENDER_SERVICE_ID }}/dev-sec-ops/api-rest-crud:latest
-
             - 
                 name: Trigger Render deployment
-                run: |
-                    curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
-                    -H "Authorization: Bearer $RENDER_API_KEY"
+                uses: JorgeLNJunior/render-deploy@v1.4.7
+                with:
+                    service_id: ${{ env.RENDER_SERVICE_ID }}
+                    api_key: ${{ env.RENDER_API_KEY }}
+                    clear_cache: true
+                    wait_deploy: true
+                    github_deployment: true
+                    deployment_environment: 'production'
+                    github_token: ${{ env.GITHUB_TOKEN }}
 
             - 
                 name: Extract deployment log summary
