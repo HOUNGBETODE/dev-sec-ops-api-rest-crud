@@ -1,16 +1,19 @@
-FROM python:3.14-slim
+FROM python:3.13-alpine
 
-# RUN apt-get update && apt-get upgrade -y
-
-RUN useradd -m devops
-RUN mkdir -p /usr/src/app && chown -R devops:devops /usr/src/app
+RUN addgroup -S devops && adduser -S devops -G devops
 
 WORKDIR /usr/src/app
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN apk add --no-cache \
+    libstdc++ \
+    && rm -rf /var/cache/apk/*
 
-COPY main.py ./
+COPY requirements.txt .
+
+RUN pip install --no-cache-dir --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+COPY main.py .
 
 USER devops
 
