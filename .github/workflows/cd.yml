@@ -1,0 +1,146 @@
+name: Build and Deploy (CD pipeline)
+
+permissions:
+    contents: read
+    packages: write
+
+on:
+    push:
+        branches:
+        - '*'
+    pull_request:
+        branches:
+        - main
+    workflow_dispatch:
+    workflow_run:
+        workflows: ["security-scan.yml"]
+        types: [completed]
+
+jobs:
+    build-image:
+        runs-on: ubuntu-latest
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        steps:
+            -
+                name: Checkout Code
+                uses: actions/checkout@v4
+            
+            - 
+                name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+
+            - 
+                name: Log in to GitHub Container Registry
+                run: |
+                    echo "${{ secrets.GITHUB_TOKEN }}" | \
+                    docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            
+            - 
+                name: Build and push Docker image
+                uses: docker/build-push-action@v5
+                with:
+                    context: .
+                    file: Dockerfile
+                    push: true
+                    tags: |
+                        ghcr.io/${{ github.repository_owner }}/spm:latest
+                        ghcr.io/${{ github.repository_owner }}/spm:${{ github.sha }}
+
+    deploy-to-render:
+        runs-on: ubuntu-latest
+        env:
+            LOG_FILE: deploy.log
+            RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+            RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+            SERVER_NAME: ${{ secrets.SERVER_NAME }}
+            DEPLOY_URL: ${{ secrets.DEPLOY_URL }}
+
+        steps:
+            - 
+                name: Checkout code
+                uses: actions/checkout@v4
+
+            -
+                name: Build an image from Dockerfile
+                run: |
+                    docker build ./Dockerfile -t dev-sec-ops/api-rest-crud
+
+            - 
+                name: Log in to Render Docker registry
+                run: echo $RENDER_API_KEY | docker login -u render --password-stdin registry.render.com
+
+            - 
+                name: Push Docker image to Render
+                run: |
+                    docker tag dev-sec-ops/api-rest-crud registry.render.com/${{ secrets.RENDER_SERVICE_ID }}/dev-sec-ops/api-rest-crud:latest
+                    docker push registry.render.com/${{ secrets.RENDER_SERVICE_ID }}/dev-sec-ops/api-rest-crud:latest
+
+            - 
+                name: Trigger Render deployment
+                run: |
+                    curl -X POST "https://api.render.com/v1/services/${{ secrets.RENDER_SERVICE_ID }}/deploys" \
+                    -H "Authorization: Bearer $RENDER_API_KEY"
+
+            - 
+                name: Extract deployment log summary
+                id: log_summary
+                if: always()
+                run: |
+                    if [ -f "$LOG_FILE" ]; then
+                        echo "log_summary<<EOF" >> $GITHUB_OUTPUT
+                        tail -n 30 $LOG_FILE >> $GITHUB_OUTPUT
+                        echo "EOF" >> $GITHUB_OUTPUT
+                    else
+                        echo "log_summary=No log file found" >> $GITHUB_OUTPUT
+                    fi
+
+            - 
+                name: Notify Email (Success)
+                if: success()
+                uses: dawidd6/action-send-mail@v4
+                with:
+                    server_address: ${{ secrets.SMTP_SERVER }}
+                    server_port: 587
+                    secure: false
+                    username: ${{ secrets.SMTP_USERNAME }}
+                    password: ${{ secrets.SMTP_PASSWORD }}
+                    to: ${{ secrets.EMAIL_TO_LIST }}
+                    from: "GitHub Actions - CD <no-reply@github.com>"
+                    subject: "✅ Déploiement réussi — Production"
+                    body: |
+                        Le déploiement en production a réussi.
+
+                        Server: ${{ env.SERVER_NAME }}
+                        Deploy URL: ${{ env.DEPLOY_URL }}
+                        Branch: ${{ github.ref }}
+                        Commit: ${{ github.sha }}
+                        Action: Déploiement standard
+                        Healthcheck: OK ✅
+
+            - 
+                name: Notify Email (Failure / Rollback)
+                if: failure()
+                uses: dawidd6/action-send-mail@v4
+                with:
+                    server_address: ${{ secrets.SMTP_SERVER }}
+                    server_port: 587
+                    secure: false
+                    username: ${{ secrets.SMTP_USERNAME }}
+                    password: ${{ secrets.SMTP_PASSWORD }}
+                    to: ${{ secrets.EMAIL_TO_LIST }}
+                    from: "GitHub Actions - CD <no-reply@github.com>"
+                    subject: "⚠️ Échec du déploiement — Rollback effectué"
+                    body: |
+                        ⚠️ Le déploiement en production a échoué.
+                        Un rollback automatique a été effectué.
+
+                        Server: ${{ env.SERVER_NAME }}
+                        Branch: ${{ github.ref }}
+                        Commit en échec: ${{ github.sha }}
+                        Action: Rollback automatique
+                        Healthcheck: FAILED ❌
+
+                        ${{ steps.log_summary.outputs.log_summary }}
+
+                        Merci de consulter les logs GitHub Actions pour plus de détails.
+
