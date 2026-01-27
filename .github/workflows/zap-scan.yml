@@ -61,7 +61,7 @@ jobs:
             - 
                 name: Run ZAP API Passive Scan
                 run: |
-                    docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-baseline.py -t http://api:80/openapi.json -g zap_passive_scan_$(date -u +'%Y%m%d').conf -r zap_passive_scan_report_$(date -u +'%Y%m%d').html
+                    sudo docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-baseline.py -t http://api:80/openapi.json -g zap_passive_scan_$(date -u +'%Y%m%d').conf -r zap_passive_scan_report_$(date -u +'%Y%m%d').html
                 continue-on-error: true
 
             # - 
@@ -87,8 +87,6 @@ jobs:
                     name: zap-artifacts
                     path: |
                         zap_scan.zip
-                        zap_passive_scan_*.conf
-                        zap_passive_scan_*.html
 
             - 
                 name: Stop Docker Container
