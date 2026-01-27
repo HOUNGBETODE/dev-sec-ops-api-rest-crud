@@ -1,12 +1,12 @@
 name: Continuous Test & Security Checks Integration (CI pipeline)
 
 on:
-    push:
-        branches:
-            - '**'
-    pull_request:
-        branches:
-            - main
+    # push:
+    #     branches:
+    #         - '**'
+    # pull_request:
+    #     branches:
+    #         - main
     workflow_dispatch:
 
 permissions:
@@ -71,7 +71,7 @@ jobs:
                 run: |
                     PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
                     bandit -r $PYTHON_FILES
-                continue-on-error: true
+                # continue-on-error: true
 
             -
                 name: Run Pylint Code Scan
@@ -82,13 +82,13 @@ jobs:
                     else
                         echo "No python files retrieved"
                     fi
-                continue-on-error: true
+                # continue-on-error: true
 
             - 
                 name: Get Bandit Security Scan Report
                 run: |
                     bandit -r . -l -i -f html -o bandit-report.html
-                continue-on-error: true
+                # continue-on-error: true
 
             - 
                 name: Upload Bandit Report as Artifact

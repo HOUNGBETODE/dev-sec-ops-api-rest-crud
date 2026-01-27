@@ -2,16 +2,16 @@
 name: TVS (Trivy Vulnerability Scanner)
 
 on:
-    push:
-        branches:
-            - '**'
-    pull_request:
-        branches:
-            - main
+    # push:
+    #     branches:
+    #         - '**'
+    # pull_request:
+    #     branches:
+    #         - main
     workflow_dispatch:
-    workflow_run:
-        workflows: ["ci.yml"]
-        types: [completed]
+    # workflow_run:
+    #     workflows: ["ci.yml"]
+    #     types: [completed]
 
 permissions:
     contents: read
@@ -95,4 +95,6 @@ jobs:
                     # ignore-unfixed: true
                     vuln-type: 'os,library'
                     severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+            
+    
 

@@ -4,16 +4,16 @@ permissions:
     contents: read
 
 on:
-    push:
-        branches:
-        - '*'
-    pull_request:
-        branches:
-        - main
+    # push:
+    #     branches:
+    #     - '*'
+    # pull_request:
+    #     branches:
+    #     - main
     workflow_dispatch:
-    workflow_run:
-        workflows: ["security-scan.yml"]
-        types: [completed]
+    # workflow_run:
+    #     workflows: ["security-scan.yml"]
+    #     types: [completed]
 
 jobs:
     build-image:
@@ -35,7 +35,7 @@ jobs:
                 run: |
                     echo "${{ secrets.GITHUB_TOKEN }}" | \
                     docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            
+
             -
                 name: Swapcase repository owner name
                 id: string

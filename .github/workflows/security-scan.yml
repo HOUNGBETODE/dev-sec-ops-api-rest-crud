@@ -5,16 +5,16 @@ permissions:
     packages: write
 
 on:
-    push:
-        branches:
-        - main
-    pull_request:
-        branches:
-        - main
+    # push:
+    #     branches:
+    #     - main
+    # pull_request:
+    #     branches:
+    #     - main
     workflow_dispatch:
-    workflow_run:
-        workflows: ["trivy-sbom.yml", "trivy-scan.yml", "zap-scan.yml"]
-        types: [completed]
+    # workflow_run:
+    #     workflows: ["trivy-sbom.yml", "trivy-scan.yml", "zap-scan.yml"]
+    #     types: [completed]
 
 jobs:
     security-scan-summary:
@@ -32,6 +32,6 @@ jobs:
                     echo "" >> $GITHUB_STEP_SUMMARY
                     echo "## Analysis Tools Run:" >> $GITHUB_STEP_SUMMARY
                     echo "- ✅ Bandit (Python security)" >> $GITHUB_STEP_SUMMARY
-                    echo "- ✅ Trivy (Code security & Container Security & Dependency Check)" >> $GITHUB_STEP_SUMMARY
+                    echo "- ✅ Trivy (Dependency Check & Container Security)" >> $GITHUB_STEP_SUMMARY
                     echo "📊 View detailed reports in the artifacts section." >> $GITHUB_STEP_SUMMARY
 

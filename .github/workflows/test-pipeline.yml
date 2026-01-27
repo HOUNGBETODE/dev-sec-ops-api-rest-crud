@@ -1,0 +1,44 @@
+---
+name: NVCS (NeuVector Container Scanner)
+
+on:
+    push:
+        branches:
+            - '**'
+    pull_request:
+        branches:
+            - main
+    workflow_dispatch:
+    # workflow_run:
+    #     workflows: ["ci.yml"]
+    #     types: [completed]
+
+permissions:
+    contents: read
+    security-events: write
+
+jobs:
+    container-sec-scan:
+        runs-on: ubuntu-latest
+        steps:
+            -
+                name: Checkout
+                uses: actions/checkout@v6
+                with:
+                    fetch-depth: 0
+
+            -
+                name: Build an image from Dockerfile
+                run: |
+                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud-${{ github.sha }}:latest .
+            
+            - 
+                name: Scan Image
+                uses: neuvector/scan-action@main
+                with:
+                    image-repository: dev-sec-ops/api-rest-crud-${{ github.sha }}
+                    image-tag: latest
+                    # min-high-cves-to-fail: "1"
+                    # min-medium-cves-to-fail: "1"
+
+# grype
