@@ -42,9 +42,12 @@ jobs:
                     context: .
                     file: Dockerfile
                     push: true
+                    # tags: |
+                    #     ghcr.io/${{ lower(github.repository_owner) }}/spm:latest
+                    #     ghcr.io/${{ lower(github.repository_owner) }}/spm:${{ github.sha }}
                     tags: |
-                        ghcr.io/${{ github.repository_owner }}/spm:latest
-                        ghcr.io/${{ github.repository_owner }}/spm:${{ github.sha }}
+                        ghcr.io/dev-sec-ops-proj-incub/spm:latest
+                        ghcr.io/dev-sec-ops-proj-incub/spm:${{ github.sha }}
 
     deploy-to-render:
         runs-on: ubuntu-latest
@@ -63,7 +66,7 @@ jobs:
             -
                 name: Build an image from Dockerfile
                 run: |
-                    docker build ./Dockerfile -t dev-sec-ops/api-rest-crud
+                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud .
 
             - 
                 name: Log in to Render Docker registry
