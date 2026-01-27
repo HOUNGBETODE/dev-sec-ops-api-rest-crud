@@ -33,12 +33,19 @@ jobs:
                     docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud-${{ github.sha }}:latest .
             
             - 
-                name: Scan Image
+                name: Scan Image with NeuVector
                 uses: neuvector/scan-action@main
                 with:
                     image-repository: dev-sec-ops/api-rest-crud-${{ github.sha }}
                     image-tag: latest
                     # min-high-cves-to-fail: "1"
                     # min-medium-cves-to-fail: "1"
+            
+            -
+                name: Scan Image with Docker Scout
+                uses: docker/scout-action@v1
+                with:
+                    command: cves,recommendations,sbom
+                    image: dev-sec-ops/api-rest-crud-${{ github.sha }}:latest
 
 # grype
