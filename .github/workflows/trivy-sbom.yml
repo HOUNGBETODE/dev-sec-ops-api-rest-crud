@@ -42,7 +42,7 @@ jobs:
     
             - 
                 name: Upload trivy report as a Github artifact
-                uses: actions/upload-artifact@v4
+                uses: actions/upload-artifact@v6
                 with:
                     name: trivy-sbom-report
                     path: '${{ github.workspace }}/dependency-results.sbom.json'
