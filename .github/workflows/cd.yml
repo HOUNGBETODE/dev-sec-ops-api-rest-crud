@@ -4,19 +4,41 @@ permissions:
     contents: read
 
 on:
-    # push:
-    #     branches:
-    #     - '*'
-    # pull_request:
-    #     branches:
-    #     - main
+    push:
+        branches:
+            - main
+    pull_request:
+        branches:
+            - main
     workflow_dispatch:
-    # workflow_run:
-    #     workflows: ["security-scan.yml"]
-    #     types: [completed]
+    workflow_run:
+        workflows: 
+            - sca.yml
+            - sast.yml
+            - cis.yml
+            - dast.yml
+        types: [completed]
 
 jobs:
+    check_security_scans:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Fail if security scans failed
+                if: ${{ github.event_name == 'workflow_run' }}
+                run: |
+                    echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+                    if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+                        echo "❌ Security scans failed or did not complete successfully"
+                        exit 1
+                    fi
+
+            - 
+                name: Continue pipeline
+                run: echo "✅ Security scans OK, continuing…"
+
     build-image:
+        needs: check_security_scans
         runs-on: ubuntu-latest
         permissions:
             packages: write
@@ -60,7 +82,6 @@ jobs:
         permissions:
             deployments: write
         env:
-            LOG_FILE: deploy.log
             RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
             RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
             SERVER_NAME: ${{ secrets.SERVER_NAME }}
@@ -83,19 +104,6 @@ jobs:
                     github_deployment: true
                     deployment_environment: 'production'
                     github_token: ${{ env.GITHUB_TOKEN }}
-
-            - 
-                name: Extract deployment log summary
-                id: log_summary
-                if: always()
-                run: |
-                    if [ -f "$LOG_FILE" ]; then
-                        echo "log_summary<<EOF" >> $GITHUB_OUTPUT
-                        tail -n 30 $LOG_FILE >> $GITHUB_OUTPUT
-                        echo "EOF" >> $GITHUB_OUTPUT
-                    else
-                        echo "log_summary=No log file found" >> $GITHUB_OUTPUT
-                    fi
 
             - 
                 name: Notify Email (Success)
@@ -121,7 +129,7 @@ jobs:
                         Healthcheck: OK ✅
 
             - 
-                name: Notify Email (Failure / Rollback)
+                name: Notify Email (Failure)
                 if: failure()
                 uses: dawidd6/action-send-mail@v4
                 with:
@@ -132,18 +140,13 @@ jobs:
                     password: ${{ secrets.SMTP_PASSWORD }}
                     to: ${{ secrets.EMAIL_TO_LIST }}
                     from: "GitHub Actions - CD <no-reply@github.com>"
-                    subject: "⚠️ Échec du déploiement — Rollback effectué"
+                    subject: "⚠️ Échec du déploiement"
                     body: |
                         ⚠️ Le déploiement en production a échoué.
-                        Un rollback automatique a été effectué.
 
                         Server: ${{ env.SERVER_NAME }}
                         Branch: ${{ github.ref }}
                         Commit en échec: ${{ github.sha }}
-                        Action: Rollback automatique
-                        Healthcheck: FAILED ❌
-
-                        ${{ steps.log_summary.outputs.log_summary }}
 
                         Merci de consulter les logs GitHub Actions pour plus de détails.
 

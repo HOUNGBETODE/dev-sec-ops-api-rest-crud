@@ -1,0 +1,109 @@
+---
+name: Automate SCA (Software Component Analysis - Software Bill Of Materials)
+
+on:
+    push:
+        branches:
+            - '**'
+        paths:
+            - requirements.txt
+    pull_request:
+        branches:
+            - main
+        paths:
+            - requirements.txt
+    workflow_dispatch:
+    workflow_run:
+        workflows: 
+            - ci.yml
+        types: [completed]
+
+permissions:
+    contents: write
+    security-events: write
+
+jobs:
+    check-ci-status:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Fail if CI pipeline failed
+                if: ${{ github.event_name == 'workflow_run' }}
+                run: |
+                    echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+                    if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+                        echo "❌ CI checks failed or did not complete successfully"
+                        exit 1
+                    fi
+
+            - 
+                name: Continue pipeline
+                run: echo "✅ CI pipeline OK, continuing…"
+    
+    generate-sbom:
+        needs: check-ci-status
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Checkout code
+                uses: actions/checkout@v6
+                with:
+                    fetch-depth: 0
+
+            - 
+                name: Run Trivy in GitHub SBOM mode and submit results to Dependency Graph
+                uses: aquasecurity/trivy-action@0.33.1
+                with:
+                    scan-type: 'fs'
+                    format: 'github' # cyclonedx
+                    output: 'dependency-results.sbom.json'
+                    scan-ref: '.'
+                    github-pat: ${{ secrets.GITHUB_TOKEN }}
+    
+            - 
+                name: Upload trivy report as a Github artifact
+                uses: actions/upload-artifact@v4
+                with:
+                    name: trivy-sbom-report
+                    path: '${{ github.workspace }}/dependency-results.sbom.json'
+                    retention-days: 2
+
+    dependencies-scan:
+        needs: generate-sbom
+        runs-on: ubuntu-latest
+        steps:
+            -
+                name: Checkout
+                uses: actions/checkout@v6
+                with:
+                    fetch-depth: 0
+            
+            -
+                name: Run TVS in fs mode (sarif)
+                uses: aquasecurity/trivy-action@0.33.1
+                with:
+                    scan-type: 'fs'
+                    scan-ref: '.'
+                    dependency-tree: true
+                    list-all-pkgs: true
+                    format: 'sarif'
+                    output: 'trivy-findings.sarif'
+
+            -
+                name: Upload Trivy scan results to GitHub Security tab
+                uses: github/codeql-action/upload-sarif@v4
+                with:
+                    sarif_file: 'trivy-findings.sarif'
+            
+            -
+                name: Run TVS in fs mode (table)
+                uses: aquasecurity/trivy-action@0.33.1
+                with:
+                    scan-type: 'fs'
+                    scan-ref: '.'
+                    exit-code: '1'
+                    dependency-tree: true
+                    list-all-pkgs: true
+                    format: 'table'
+                    severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+

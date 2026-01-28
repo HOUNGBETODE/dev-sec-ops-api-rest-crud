@@ -1,5 +1,5 @@
 ---
-name: OZVS (OWASP ZAP Vulnerability Scanner)
+name: Automate DAST (Dynamic Application Security Testing)
 
 on:
     push:
@@ -9,17 +9,36 @@ on:
         branches:
             - main
     workflow_dispatch:
-    # workflow_run:
-    #     workflows: ["ci.yml"]
-    #     types: [completed]
+    workflow_run:
+        workflows: 
+            - ci.yml
+        types: [completed]
 
 permissions:
     contents: read
     security-events: write
-    # issues: write
+    issues: write
 
 jobs:
-    zap-api-scan:
+    check-ci-status:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Fail if CI pipeline failed
+                if: ${{ github.event_name == 'workflow_run' }}
+                run: |
+                    echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+                    if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+                        echo "❌ CI checks failed or did not complete successfully"
+                        exit 1
+                    fi
+
+            - 
+                name: Continue pipeline
+                run: echo "✅ CI pipeline OK, continuing…"
+    
+    dynamic-api-scan:
+        needs: check-ci-status
         runs-on: ubuntu-latest
         steps:
             -
@@ -28,17 +47,17 @@ jobs:
                 with:
                     fetch-depth: 0
 
-            - 
-                name: Create options.prop file
-                run: |
-                    cat << EOF > options.prop
-                    -config replacer.full_list(0).description=Auth Header
-                    -config replacer.full_list(0).enabled=true
-                    -config replacer.full_list(0).matchtype=REQ_HEADER
-                    -config replacer.full_list(1).matchstr=Authorization
-                    -config replacer.full_list(1).regex=false
-                    -config replacer.full_list(1).replacement=Bearer ${{ secrets.BASIC_AUTH }}
-                    EOF
+            # - 
+            #     name: Create options.prop file
+            #     run: |
+            #         cat << EOF > options.prop
+            #         -config replacer.full_list(0).description=Auth Header
+            #         -config replacer.full_list(0).enabled=true
+            #         -config replacer.full_list(0).matchtype=REQ_HEADER
+            #         -config replacer.full_list(1).matchstr=Authorization
+            #         -config replacer.full_list(1).regex=false
+            #         -config replacer.full_list(1).replacement=Bearer ${{ secrets.BASIC_AUTH }}
+            #         EOF
 
             -
                 name: Build Docker Image
@@ -84,7 +103,7 @@ jobs:
                 name: Run ZAP Full Scan
                 uses: zaproxy/action-full-scan@v0.13.0
                 with:
-                    target: http://localhost:8080
+                    target: http://api:80
 
             - 
                 name: Upload ZAP artifacts

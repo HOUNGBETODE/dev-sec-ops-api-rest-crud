@@ -1,0 +1,113 @@
+---
+name: Automate CIS (Container Image Scanning)
+
+on:
+    push:
+        branches:
+            - '**'
+    pull_request:
+        branches:
+            - main
+    workflow_dispatch:
+    workflow_run:
+        workflows: 
+            - ci.yml
+        types: [completed]
+
+permissions:
+    contents: read
+    security-events: write
+
+jobs:
+    check-ci-status:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Fail if CI pipeline failed
+                if: ${{ github.event_name == 'workflow_run' }}
+                run: |
+                    echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+                    if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+                        echo "❌ CI checks failed or did not complete successfully"
+                        exit 1
+                    fi
+
+            - 
+                name: Continue pipeline
+                run: echo "✅ CI pipeline OK, continuing…"
+        
+    container-security-scan:
+        needs: check-ci-status
+        runs-on: ubuntu-latest
+        steps:
+            -
+                name: Checkout
+                uses: actions/checkout@v6
+                with:
+                    fetch-depth: 0
+
+            -
+                name: Build an image from Dockerfile
+                run: |
+                    docker build -f ./Dockerfile -t dev-sec-ops/api-rest-crud-${{ github.sha }}:latest .
+            
+            - 
+                name: Scan Image with Trivy in sarif format
+                uses: aquasecurity/trivy-action@0.33.1
+                with:
+                    image-ref: 'dev-sec-ops/api-rest-crud-${{ github.sha }}:latest'
+                    format: 'sarif'
+                    output: 'trivy-scan-report.sarif'
+
+            - 
+                name: Upload Trivy scan report to GitHub Security tab
+                uses: github/codeql-action/upload-sarif@v4
+                with:
+                    sarif_file: 'trivy-scan-report.sarif'
+            
+            - 
+                name: Upload Trivy Report as Artifact
+                uses: actions/upload-artifact@v6
+                with:
+                    name: trivy-findings
+                    path: |
+                        trivy-scan-report.sarif
+
+            - 
+                name: Scan Image with Trivy in table format
+                uses: aquasecurity/trivy-action@0.33.1
+                with:
+                    image-ref: 'dev-sec-ops/api-rest-crud-${{ github.sha }}:latest'
+                    format: 'table'
+                    exit-code: '1'
+                    ignore-unfixed: true
+                    vuln-type: 'os,library'
+                    severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+            
+            -
+                name: Scan Image with Docker Scout
+                uses: docker/scout-action@v1.18.2
+                with:
+                    dockerhub-user: ${{ secrets.DOCKER_USER }}
+                    dockerhub-password: ${{ secrets.DOCKER_PASSWORD }}
+                    command: quickview,cves,recommendations
+                    sarif-file: docker-scout-report.sarif
+                    exit-code: true
+            
+            - 
+                name: Upload Docker Scout Report as Artifact
+                uses: actions/upload-artifact@v6
+                with:
+                    name: docker-scout-findings
+                    path: |
+                        docker-scout-report.sarif
+            
+            - 
+                name: Scan Image with NeuVector
+                uses: neuvector/scan-action@main
+                with:
+                    image-repository: dev-sec-ops/api-rest-crud-${{ github.sha }}
+                    image-tag: latest
+                    min-high-cves-to-fail: "1"
+                    min-medium-cves-to-fail: "2"
+

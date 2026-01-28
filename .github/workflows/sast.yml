@@ -1,0 +1,125 @@
+---
+name: Automate SAST (Static Application Security Testing)
+
+on:
+    push:
+        branches:
+            - '**'
+        paths:
+            - .github/workflows/semgrep.yml 
+    pull_request:
+        branches:
+            - main
+        paths:
+            - .github/workflows/semgrep.yml  
+    workflow_dispatch:
+    workflow_run:
+        workflows: 
+            - ci.yml
+        types: [completed]
+
+permissions:
+    contents: read
+    security-events: write
+
+jobs:
+    check-ci-status:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Fail if CI pipeline failed
+                if: ${{ github.event_name == 'workflow_run' }}
+                run: |
+                    echo "Conclusion: ${{ github.event.workflow_run.conclusion }}"
+                    if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+                        echo "❌ CI checks failed or did not complete successfully"
+                        exit 1
+                    fi
+
+            - 
+                name: Continue pipeline
+                run: echo "✅ CI pipeline OK, continuing…"
+
+    sast-semgrep-ce-scan:
+        needs: check-ci-status
+        runs-on: ubuntu-latest
+        container:
+            image: semgrep/semgrep
+        steps:
+            -
+                name: Run Semgrep CE SAST Scan
+                run: semgrep scan --config auto
+    
+    code-vuln-scan:
+        needs: check-ci-status
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Run Semgrep SAST Scan
+                uses: returntocorp/semgrep-action@v1
+                    p/secrets
+                    p/owasp-top-ten
+                    p/ci
+                generateSarif: 1
+                env:
+                    SEMGREP_TIMEOUT: 300
+            
+            - 
+                name: Upload Semgrep SARIF Report
+                uses: github/codeql-action/upload-sarif@v3
+                with:
+                    sarif_file: semgrep.sarif
+                    category: semgrep
+
+            - 
+                name: Upload Semgrep Report as Artifact
+                uses: actions/upload-artifact@v6
+                with:
+                    name: semgrep-findings
+                    path: semgrep.sarif
+            
+            - 
+                name: Run Snyk Security Scan
+                uses: snyk/actions/python@master
+                continue-on-error: true
+                env:
+                    SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+                with:
+                    args: --sarif-file-output=snyk-report.sarif
+
+            - 
+                name: Upload Snyk SARIF Report
+                uses: github/codeql-action/upload-sarif@v3
+                with:
+                    sarif_file: snyk-report.sarif
+                    category: snyk
+
+            - 
+                name: Upload Snyk Report as Artifact
+                uses: actions/upload-artifact@v6
+                with:
+                    name: snyk-findings
+                    path: snyk-report.sarif
+
+            - 
+                name: SonarQube Scan
+                uses: sonarsource/sonarqube-scan-action@master
+                env:
+                    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                    SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+                with:
+                    args: >
+                        -Dsonar.projectKey=${{ github.repository_owner }}_${{ github.event.repository.name }}
+                        -Dsonar.python.version=3.14
+                        -Dsonar.sources=.
+                        -Dsonar.exclusions=**/*test*/**,**/__pycache__/**,**/venv/**,**/node_modules/**
+                        -Dsonar.python.bandit.reportPaths=bandit-report.json
+
+            - 
+                name: SonarQube Quality Gate Check
+                uses: sonarsource/sonarqube-quality-gate-action@master
+                timeout-minutes: 5
+                env:
+                    SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+                    SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
