@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import FastAPI, Depends, HTTPException, status, Request
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, HTTPBasic, HTTPBasicCredentials
 from sqlalchemy import create_engine, Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
-from jose import JWTError, jwt
+import jwt
 from datetime import datetime, timedelta
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict
@@ -12,9 +12,20 @@ import enum
 import os
 from dotenv import load_dotenv
 from math import radians, cos, sin, asin, sqrt
+from prometheus_fastapi_instrumentator import Instrumentator
+from prometheus_client import Counter, Histogram
 
+import logging, uuid, json, time, secrets
 
 load_dotenv()
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(message)s",
+)
+
+logger = logging.getLogger("api")
 
 
 # Configuration
@@ -294,7 +305,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username, role=role)
-    except JWTError:
+    except Exception:
         raise credentials_exception
     user = db.query(User).filter(User.username == token_data.username).first()
     if user is None:
@@ -328,12 +339,94 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+
+@app.middleware("http")
+async def request_logging_middleware(request: Request, call_next):
+    start_time = time.time()
+    request_id = str(uuid.uuid4())
+
+    response = await call_next(request)
+
+    process_time = round(time.time() - start_time, 4)
+
+    log_data = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "request_id": request_id,
+        "method": request.method,
+        "path": request.url.path,
+        "status_code": response.status_code,
+        "duration_ms": int(process_time * 1000),
+        "client_ip": request.client.host if request.client else None,
+        "user_agent": request.headers.get("user-agent"),
+    }
+
+    logger.info(json.dumps(log_data))
+
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+
+PROM_USERNAME = os.environ.get("PROM_USERNAME", None)
+PROM_PASSWORD = os.environ.get("PROM_PASSWORD", None)
+
+def basic_auth(credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
+    correct_username = secrets.compare_digest(credentials.username, PROM_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, PROM_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return True
+
+
+Instrumentator(
+    should_group_status_codes=False,
+    should_ignore_untemplated=True,
+    should_respect_env_var=True,
+    should_instrument_requests_inprogress=True,
+    excluded_handlers=["/metrics"],
+    env_var_name="ENABLE_METRICS",
+    inprogress_name="inprogress",
+    inprogress_labels=True
+).instrument(app).expose(
+    app,
+    endpoint="/metrics",
+    dependencies=[Depends(basic_auth)]
+)
+
+
+ORDERS_CREATED = Counter(
+    "orders_created_total",
+    "Total number of orders created"
+)
+
+ORDERS_PAID = Counter(
+    "orders_paid_total",
+    "Total number of paid orders"
+)
+
+ORDER_TOTAL_AMOUNT = Histogram(
+    "order_total_amount",
+    "Order total amount distribution",
+    buckets=(10, 25, 50, 100, 200, 500, 1000)
+)
+
+LOGIN_FAILURES = Counter(
+    "login_failures_total",
+    "Total failed login attempts"
+)
+
 # ==================== AUTH ENDPOINTS ====================
 @app.post("/token", response_model=Token, tags=["Authentication"])
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Connexion pour Admin, Vendeur ou Livreur"""
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
+        LOGIN_FAILURES.inc()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -682,6 +775,17 @@ async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     db.query(CartItem).filter(CartItem.session_id == order_data.session_id).delete()
     
     db.commit()
+
+    ORDERS_CREATED.inc()
+    ORDER_TOTAL_AMOUNT.observe(total)
+
+    logger.info(json.dumps({
+        "event": "order_created",
+        "order_id": order.id,
+        "order_number": order.order_number,
+        "total": total
+    }))
+
     return order
 
 @app.post("/orders/{order_id}/payment", tags=["Public - Orders"])
@@ -699,6 +803,7 @@ async def process_payment(
     order.payment_reference = payment_reference
     order.status = OrderStatus.PAID
     order.paid_at = datetime.utcnow()
+    ORDERS_PAID.inc()
     
     # Find closest delivery person
     order_items = db.query(OrderItem).filter(OrderItem.order_id == order_id).all()
@@ -734,6 +839,13 @@ async def process_payment(
             order.status = OrderStatus.ASSIGNED
     
     db.commit()
+
+    logger.info(json.dumps({
+        "event": "order_paid",
+        "order_id": order.id,
+        "payment_reference": payment_reference
+    }))
+
     return {"message": "Payment processed and delivery assigned", "order_id": order.id}
 
 @app.get("/orders/global-sales", tags=["Public - Statistics"])
