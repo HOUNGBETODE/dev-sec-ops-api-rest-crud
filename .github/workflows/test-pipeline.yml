@@ -18,7 +18,7 @@ permissions:
     security-events: write
 
 jobs:
-    container-sec-scan:
+    container-security-scan:
         runs-on: ubuntu-latest
         steps:
             -
@@ -70,4 +70,3 @@ jobs:
                     path: |
                         docker-scout-report.sarif
 
-# grype
