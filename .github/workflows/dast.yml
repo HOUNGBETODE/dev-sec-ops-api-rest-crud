@@ -106,14 +106,6 @@ jobs:
                     target: http://api:80
 
             - 
-                name: Upload ZAP artifacts
-                uses: actions/upload-artifact@v6
-                with:
-                    name: zap-artifacts
-                    path: |
-                        zap_scan.zip
-
-            - 
                 name: Stop Docker Container
                 run: |
                     docker stop api || true

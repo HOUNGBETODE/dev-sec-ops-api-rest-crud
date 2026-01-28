@@ -83,13 +83,11 @@ jobs:
                     else
                         echo "No python files retrieved"
                     fi
-                # continue-on-error: true
 
             - 
                 name: Get Bandit Security Scan Report
                 run: |
-                    bandit -r . -l -i -f html -o bandit-report.html
-                # continue-on-error: true
+                    bandit -r . -ll -ii -f html -o bandit-report.html
 
             - 
                 name: Upload Bandit Report as Artifact
