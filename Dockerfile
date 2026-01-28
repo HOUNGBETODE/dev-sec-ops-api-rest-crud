@@ -14,7 +14,6 @@ RUN chown -R devops:devops /usr/src/app
 
 RUN apk add --no-cache \
     libstdc++ \
-    curl \
     && rm -rf /var/cache/apk/*
 
 COPY requirements.txt .
