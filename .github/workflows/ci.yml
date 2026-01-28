@@ -71,8 +71,7 @@ jobs:
                 name: Run Bandit Security Scan
                 run: |
                     PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
-                    bandit -r $PYTHON_FILES
-                # continue-on-error: true
+                    bandit -r $PYTHON_FILES -ll -ii
 
             -
                 name: Run Pylint Code Scan
