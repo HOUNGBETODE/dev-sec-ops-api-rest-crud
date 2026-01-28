@@ -8,9 +8,9 @@ PATH=/usr/local/bin:$PATH
 
 RUN addgroup -S devops && adduser -S devops -G devops
 
-RUN mkdir -p /usr/src/app && chown -R devops:devops /usr/src/app
-
 WORKDIR /usr/src/app
+
+RUN chown -R devops:devops /usr/src/app
 
 RUN apk add --no-cache \
     libstdc++ \
