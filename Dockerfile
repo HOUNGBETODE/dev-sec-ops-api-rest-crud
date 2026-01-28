@@ -2,12 +2,17 @@ FROM python:3.14.2-alpine3.23
 
 RUN apk update && apk upgrade --no-cache
 
+ENV PYTHONUNBUFFERED=1 \
+PIP_NO_CACHE_DIR=1 \
+PATH=/usr/local/bin:$PATH
+
 RUN addgroup -S devops && adduser -S devops -G devops
 
 WORKDIR /usr/src/app
 
 RUN apk add --no-cache \
     libstdc++ \
+    curl \
     && rm -rf /var/cache/apk/*
 
 COPY requirements.txt .
