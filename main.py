@@ -371,7 +371,10 @@ async def request_logging_middleware(request: Request, call_next):
 PROM_USERNAME = os.environ.get("PROM_USERNAME", None)
 PROM_PASSWORD = os.environ.get("PROM_PASSWORD", None)
 
-def basic_auth(credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
+async def basic_auth(credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
+    if PROM_USERNAME is None or PROM_PASSWORD is None:
+        raise HTTPException(status_code=500, detail="Metrics auth not configured")
+    
     correct_username = secrets.compare_digest(credentials.username, PROM_USERNAME)
     correct_password = secrets.compare_digest(credentials.password, PROM_PASSWORD)
     if not (correct_username and correct_password):
@@ -383,20 +386,24 @@ def basic_auth(credentials: HTTPBasicCredentials = Depends(HTTPBasic())):
     return True
 
 
-Instrumentator(
+instrumentator = Instrumentator(
     should_group_status_codes=False,
     should_ignore_untemplated=True,
-    should_respect_env_var=True,
+    should_respect_env_var=False,
     should_instrument_requests_inprogress=True,
     excluded_handlers=["/metrics"],
-    env_var_name="ENABLE_METRICS",
     inprogress_name="inprogress",
     inprogress_labels=True
-).instrument(app).expose(
+)
+
+instrumentator.instrument(app)
+
+instrumentator.expose(
     app,
     endpoint="/metrics",
     dependencies=[Depends(basic_auth)]
 )
+
 
 
 ORDERS_CREATED = Counter(
