@@ -61,7 +61,7 @@ jobs:
             -
                 name: Swapcase repository owner name
                 id: string
-                uses: ASzc/change-string-case-action@v1
+                uses: ASzc/change-string-case-action@v6
                 with:
                     string: ${{ github.repository_owner }}
 
