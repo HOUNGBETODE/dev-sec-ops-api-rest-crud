@@ -108,7 +108,7 @@ jobs:
             - 
                 name: Notify Email (Success)
                 if: success()
-                uses: dawidd6/action-send-mail@v4
+                uses: dawidd6/action-send-mail@v7
                 with:
                     server_address: ${{ secrets.SMTP_SERVER }}
                     server_port: 587
@@ -131,7 +131,7 @@ jobs:
             - 
                 name: Notify Email (Failure)
                 if: failure()
-                uses: dawidd6/action-send-mail@v4
+                uses: dawidd6/action-send-mail@v7
                 with:
                     server_address: ${{ secrets.SMTP_SERVER }}
                     server_port: 587
