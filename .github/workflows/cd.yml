@@ -30,20 +30,20 @@ jobs:
                     EVENT="${{ github.event_name }}"
 
                     if [ "$EVENT" = "pull_request" ]; then
-                    BRANCH="${{ github.base_ref }}"
+                        BRANCH="${{ github.base_ref }}"
                     else
-                    BRANCH="${{ github.ref_name }}"
+                        BRANCH="${{ github.ref_name }}"
                     fi
 
                     echo "Event: $EVENT"
                     echo "Target branch: $BRANCH"
 
                     if [ "$BRANCH" = "main" ]; then
-                    echo "✅ Allowed branch '$BRANCH' to trigger deploy."
-                    exit 0
+                        echo "✅ Allowed branch '$BRANCH' to trigger deploy."
+                        exit 0
                     else
-                    echo "::error ::Branch '$BRANCH' is not allowed to trigger deploy."
-                    exit 1
+                        echo "::error ::Branch '$BRANCH' is not allowed to trigger deploy."
+                        exit 1
                     fi
 
     check-security-scans:
