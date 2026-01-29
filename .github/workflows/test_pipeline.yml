@@ -57,13 +57,10 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest requests
 
-      - name: List  files
-        run: ls -la
-
       - name: Run pytest to create admin & get token
         id: auth
         run: |
-          pytest tests/test_auth_flow.py -s
+          pytest tests/auth_flow.py -s
      
       - name: Display token
         run: echo "The admin token is ${{ steps.auth.outputs.token }}"
