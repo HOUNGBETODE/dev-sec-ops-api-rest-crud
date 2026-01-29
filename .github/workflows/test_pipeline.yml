@@ -61,8 +61,7 @@ jobs:
             --network zap-net \
             -e API_URL=$DOCKER_API_URL \
             dev-sec-ops/api-rest-crud \
-            pytest tests/auth_flow.py -s \
-            | grep "ADMIN_TOKEN=" | cut -d= -f2)
+            pytest tests/auth_flow.py -s)
 
             echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
