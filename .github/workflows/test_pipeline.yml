@@ -58,7 +58,7 @@ jobs:
       - name: Run tests inside Docker and extract token
         id: auth
         run: |
-            $TOKEN=$(docker exec api pytest tests/auth_flow.py -s | grep "ADMIN_TOKEN=" | cut -d= -f2)
+            TOKEN=$(docker exec api pytest tests/auth_flow.py -s | grep "ADMIN_TOKEN=" | cut -d= -f2)
             echo "token=$TOKEN" >> $GITHUB_OUTPUT
 
       - name: Display token
