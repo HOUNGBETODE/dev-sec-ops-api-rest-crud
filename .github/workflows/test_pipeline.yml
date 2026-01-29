@@ -10,7 +10,8 @@ jobs:
   test-and-scan:
     runs-on: ubuntu-latest
     env:
-      API_URL: http://api:80
+      API_URL: http://localhost:80
+      DOCKER_API_URL: http://api:80
     
     steps:
       - name: Checkout repository
@@ -58,7 +59,7 @@ jobs:
         run: |
             TOKEN=$(docker run --rm \
             --network zap-net \
-            -e API_URL=$API_URL \
+            -e API_URL=$DOCKER_API_URL \
             dev-sec-ops/api-rest-crud \
             pytest tests/auth_flow.py -s \
             | grep "ADMIN_TOKEN=" | cut -d= -f2)
