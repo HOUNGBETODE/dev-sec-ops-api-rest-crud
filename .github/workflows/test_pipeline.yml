@@ -10,8 +10,7 @@ jobs:
   test-and-scan:
     runs-on: ubuntu-latest
     env:
-      API_URL: http://localhost:8080
-
+      API_URL: http://api:80
     
     steps:
       - name: Checkout repository
@@ -28,7 +27,7 @@ jobs:
             echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
-        run: docker build -t dev-sec-ops/api-rest-crud .
+        run: docker build -f ./Dockerfile.zap -t dev-sec-ops/api-rest-crud .
 
       - name: Create Docker network
         run: docker network create zap-net || true
@@ -54,13 +53,17 @@ jobs:
           docker logs api
           exit 1
 
-      - name: Install test dependencies
-        run: pip install pytest requests
-
-      - name: Run pytest to create admin & get token
+      - name: Run tests inside Docker and extract token
         id: auth
         run: |
-          pytest tests/auth_flow.py -s
-     
+            TOKEN=$(docker run --rm \
+            --network zap-net \
+            -e API_URL=$API_URL \
+            dev-sec-ops/api-rest-crud \
+            pytest tests/auth_flow.py -s \
+            | grep "ADMIN_TOKEN=" | cut -d= -f2)
+
+            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
       - name: Display token
         run: echo "The admin token is ${{ steps.auth.outputs.token }}"
