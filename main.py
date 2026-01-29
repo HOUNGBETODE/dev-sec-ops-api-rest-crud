@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.orm import sessionmaker, Session, relationship
 from passlib.context import CryptContext
 import jwt
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict
 import enum
@@ -73,7 +73,7 @@ class User(Base):
     hashed_password = Column(String, nullable=False)
     role = Column(SQLEnum(UserRole), nullable=False)
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     # Vendor specific
     phone = Column(String)
@@ -93,7 +93,7 @@ class Category(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
     description = Column(String)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     products = relationship("Product", back_populates="category")
 
@@ -107,7 +107,7 @@ class Product(Base):
     stock = Column(Integer, default=0)
     image_url = Column(String)
     status = Column(SQLEnum(ProductStatus), default=ProductStatus.PENDING)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     category_id = Column(Integer, ForeignKey("categories.id"))
     vendor_id = Column(Integer, ForeignKey("users.id"))
@@ -136,7 +136,7 @@ class Order(Base):
     payment_reference = Column(String)  # Fedapay reference
     
     delivery_person_id = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     paid_at = Column(DateTime)
     delivered_at = Column(DateTime)
     
@@ -162,7 +162,7 @@ class CartItem(Base):
     session_id = Column(String, index=True, nullable=False)  # Pour clients anonymes
     product_id = Column(Integer, ForeignKey("products.id"))
     quantity = Column(Integer, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     
     product = relationship("Product", back_populates="cart_items")
 
@@ -285,9 +285,9 @@ def get_password_hash(password):
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
@@ -341,6 +341,19 @@ app = FastAPI(
 
 
 
+HTTP_REQUESTS_TOTAL = Counter(
+    "http_requests_total",
+    "Total number of HTTP requests",
+    ["method", "path", "status_code"]
+)
+
+HTTP_REQUEST_DURATION_MS = Histogram(
+    "http_request_duration_ms",
+    "HTTP request duration in milliseconds",
+    ["method", "path", "status_code"],
+    buckets=[10, 50, 100, 300, 500, 1000, 2000, 5000]
+)
+
 @app.middleware("http")
 async def request_logging_middleware(request: Request, call_next):
     start_time = time.time()
@@ -349,14 +362,27 @@ async def request_logging_middleware(request: Request, call_next):
     response = await call_next(request)
 
     process_time = round(time.time() - start_time, 4)
+    duration_ms = int(process_time * 1000)
+
+    HTTP_REQUESTS_TOTAL.labels(
+        method=request.method,
+        path=request.url.path,
+        status_code=str(response.status_code)
+    ).inc()
+
+    HTTP_REQUEST_DURATION_MS.labels(
+        method=request.method,
+        path=request.url.path,
+        status_code=str(response.status_code)
+    ).observe(duration_ms)
 
     log_data = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "request_id": request_id,
         "method": request.method,
         "path": request.url.path,
         "status_code": response.status_code,
-        "duration_ms": int(process_time * 1000),
+        "duration_ms": duration_ms,
         "client_ip": request.client.host if request.client else None,
         "user_agent": request.headers.get("user-agent"),
     }
@@ -752,7 +778,7 @@ async def create_order(order_data: OrderCreate, db: Session = Depends(get_db)):
     total = sum(item.product.price * item.quantity for item in cart_items)
     
     # Create order
-    order_number = f"ORD-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+    order_number = f"ORD-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}"
     order = Order(
         order_number=order_number,
         client_name=order_data.client_name,
@@ -809,7 +835,7 @@ async def process_payment(
     # TODO: Intégrer vraiment Fedapay ici
     order.payment_reference = payment_reference
     order.status = OrderStatus.PAID
-    order.paid_at = datetime.utcnow()
+    order.paid_at = datetime.now(timezone.utc)
     ORDERS_PAID.inc()
     
     # Find closest delivery person
@@ -898,7 +924,7 @@ async def update_delivery_status(
     
     order.status = new_status
     if new_status == OrderStatus.DELIVERED:
-        order.delivered_at = datetime.utcnow()
+        order.delivered_at = datetime.now(timezone.utc)
     
     db.commit()
     return {"message": "Status updated successfully"}
