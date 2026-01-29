@@ -40,9 +40,7 @@ jobs:
     dynamic-api-scan:
         needs: check-ci-status
         runs-on: ubuntu-latest
-        env:
-            API_URL: http://localhost:8080
-            DOCKER_API_URL: http://api:80
+        
         steps:
             -
                 name: Checkout Code
@@ -83,7 +81,7 @@ jobs:
                     docker run -d --name api --network zap-net -p 8080:80 \
                         -e SQLALCHEMY_DATABASE_URL="sqlite:////usr/src/app/test.db" \
                         -e SECRET_KEY="${{ steps.generate_secret.outputs.SECRET_KEY }}" \
-                        -e API_URL=$DOCKER_API_URL \
+                        -e API_URL=http://api:80 \
                         dev-sec-ops/api-rest-crud
 
             - 
@@ -91,7 +89,7 @@ jobs:
                 run: |
                     echo "Waiting for API to be ready..."
                     for i in {1..30}; do
-                        if curl -f $API_URL; then
+                        if curl -f http://localhost:8080; then
                         echo "API is up!"
                         exit 0
                         fi
@@ -115,7 +113,7 @@ jobs:
             - 
                 name: Run ZAP API Passive Scan
                 run: |
-                    sudo docker run --rm --user root --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-baseline.py -t $DOCKER_API_URL/openapi.json -g zap_passive_scan_$(date -u +'%Y%m%d').conf -r zap_passive_scan_report_$(date -u +'%Y%m%d').html
+                    sudo docker run --rm --user root --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-baseline.py -t http://api:80/openapi.json -g zap_passive_scan_$(date -u +'%Y%m%d').conf -r zap_passive_scan_report_$(date -u +'%Y%m%d').html
                 continue-on-error: true
 
             # - 
@@ -128,7 +126,7 @@ jobs:
                 name: Run ZAP Basic Full Scan
                 uses: zaproxy/action-full-scan@v0.13.0
                 with:
-                    target: $DOCKER_API_URL
+                    target: http://api:80
 
             -
                 name: Run ZAP Advanced API Scan
@@ -137,7 +135,7 @@ jobs:
                     token: ${{ secrets.GITHUB_TOKEN }}
                     docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
                     format: openapi
-                    target: $DOCKER_API_URL
+                    target: http://api:80
                     cmd_options: '-a'
                     allow_issue_writing: true
                     issue_title: ZAP Advanced API Scan ${{ github.sha }}
