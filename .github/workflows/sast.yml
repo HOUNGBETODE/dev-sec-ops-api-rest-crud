@@ -2,16 +2,16 @@
 name: Automate SAST (Static Application Security Testing)
 
 on:
-    push:
-        branches:
-            - '**'
-        paths:
-            - .github/workflows/semgrep.yml 
-    pull_request:
-        branches:
-            - main
-        paths:
-            - .github/workflows/semgrep.yml  
+    # push:
+    #     branches:
+    #         - '**'
+    #     paths:
+    #         - .github/workflows/semgrep.yml 
+    # pull_request:
+    #     branches:
+    #         - main
+    #     paths:
+    #         - .github/workflows/semgrep.yml  
     workflow_dispatch:
     workflow_run:
         workflows: 
@@ -65,7 +65,7 @@ jobs:
             
             # - 
             #     name: Upload Semgrep SARIF Report
-            #     uses: github/codeql-action/upload-sarif@v3
+            #     uses: github/codeql-action/upload-sarif@v4
             #     with:
             #         sarif_file: semgrep.sarif
             #         category: semgrep
@@ -88,7 +88,7 @@ jobs:
 
             - 
                 name: Upload Snyk SARIF Report
-                uses: github/codeql-action/upload-sarif@v3
+                uses: github/codeql-action/upload-sarif@v4
                 with:
                     sarif_file: snyk-report.sarif
                     category: snyk

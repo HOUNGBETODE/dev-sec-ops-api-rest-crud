@@ -2,13 +2,13 @@
 name: Automate DAST (Dynamic Application Security Testing)
 
 on:
-    push:
-        branches:
-            - '**'
-    pull_request:
-        branches:
-            - main
-    workflow_dispatch:
+    # push:
+    #     branches:
+    #         - '**'
+    # pull_request:
+    #     branches:
+    #         - main
+    # workflow_dispatch:
     workflow_run:
         workflows: 
             - ci.yml
@@ -89,21 +89,43 @@ jobs:
             #         docker run --rm --network zap-net -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-weekly zap-api-scan.py -t http://api:80/openapi.json -f openapi -c options.prop -r zap_active_scan_report_$(date -u +'%Y%m%d').html
             #     continue-on-error: true
 
-            # -
-            #     name: Run ZAP Full Scan
-            #     uses: zaproxy/action-full-scan@v0.13.0
-            #     with:
-            #         token: ${{ secrets.GITHUB_TOKEN }}
-            #         docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
-            #         target: http://api:80
-            #         cmd_options: '-a'
-            #         allow_issue_writing: false
-
             -
-                name: Run ZAP Full Scan
+                name: Run ZAP Basic Full Scan
                 uses: zaproxy/action-full-scan@v0.13.0
                 with:
                     target: http://api:80
+
+            -
+                name: Run ZAP Advanced API Scan
+                uses: zaproxy/action-api-scan@v0.10.0
+                with:
+                    token: ${{ secrets.GITHUB_TOKEN }}
+                    docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+                    format: openapi
+                    target: http://api:80
+                    cmd_options: '-a'
+                    allow_issue_writing: true
+                    issue_title: ZAP Advanced API Scan ${{ github.sha }}
+                    artifact_name: zap-api-scan-report
+                env:
+                    ZAP_AUTH_HEADER: Authorization
+                    ZAP_AUTH_HEADER_VALUE: Bearer ...
+            
+            -
+                name: Run ZAP Advanced Full Scan
+                uses: zaproxy/action-full-scan@v0.13.0
+                with:
+                    token: ${{ secrets.GITHUB_TOKEN }}
+                    docker_name: 'ghcr.io/zaproxy/zaproxy:stable'
+                    format: openapi
+                    target: http://api:80
+                    cmd_options: '-a'
+                    allow_issue_writing: true
+                    issue_title: ZAP Advanced Full Scan ${{ github.sha }}
+                    artifact_name: zap-full-active-scan-report
+                env:
+                    ZAP_AUTH_HEADER: WWW-Authenticate
+                    ZAP_AUTH_HEADER_VALUE:
 
             - 
                 name: Stop Docker Container

@@ -2,16 +2,16 @@
 name: Automate SCA (Software Component Analysis - Software Bill Of Materials)
 
 on:
-    push:
-        branches:
-            - '**'
-        paths:
-            - requirements.txt
-    pull_request:
-        branches:
-            - main
-        paths:
-            - requirements.txt
+    # push:
+    #     branches:
+    #         - '**'
+    #     paths:
+    #         - requirements.txt
+    # pull_request:
+    #     branches:
+    #         - main
+    #     paths:
+    #         - requirements.txt
     workflow_dispatch:
     workflow_run:
         workflows: 

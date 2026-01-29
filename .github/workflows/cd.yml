@@ -4,12 +4,12 @@ permissions:
     contents: read
 
 on:
-    push:
-        branches:
-            - main
-    pull_request:
-        branches:
-            - main
+    # push:
+    #     branches:
+    #         - main
+    # pull_request:
+    #     branches:
+    #         - main
     workflow_dispatch:
     workflow_run:
         workflows: 
@@ -20,7 +20,34 @@ on:
         types: [completed]
 
 jobs:
-    check_security_scans:
+    check-branch-origin:
+        runs-on: ubuntu-latest
+        steps:
+            - 
+                name: Check PR source branch name
+                shell: bash
+                run: |
+                    EVENT="${{ github.event_name }}"
+
+                    if [ "$EVENT" = "pull_request" ]; then
+                    BRANCH="${{ github.base_ref }}"
+                    else
+                    BRANCH="${{ github.ref_name }}"
+                    fi
+
+                    echo "Event: $EVENT"
+                    echo "Target branch: $BRANCH"
+
+                    if [ "$BRANCH" = "main" ]; then
+                    echo "✅ Allowed branch '$BRANCH' to trigger deploy."
+                    exit 0
+                    else
+                    echo "::error ::Branch '$BRANCH' is not allowed to trigger deploy."
+                    exit 1
+                    fi
+
+    check-security-scans:
+        nedds: check-branch-origin
         runs-on: ubuntu-latest
         steps:
             - 
@@ -38,7 +65,7 @@ jobs:
                 run: echo "✅ Security scans OK, continuing…"
 
     build-image:
-        needs: check_security_scans
+        needs: check-security-scans
         runs-on: ubuntu-latest
         permissions:
             packages: write
@@ -46,7 +73,7 @@ jobs:
         steps:
             -
                 name: Checkout Code
-                uses: actions/checkout@v4
+                uses: actions/checkout@v6
             
             - 
                 name: Set up Docker Buildx
@@ -61,13 +88,13 @@ jobs:
             -
                 name: Swapcase repository owner name
                 id: string
-                uses: ASzc/change-string-case-action@v1
+                uses: ASzc/change-string-case-action@v6
                 with:
                     string: ${{ github.repository_owner }}
 
             - 
                 name: Build and push Docker image
-                uses: docker/build-push-action@v5
+                uses: docker/build-push-action@v6
                 with:
                     context: .
                     file: Dockerfile
@@ -91,7 +118,7 @@ jobs:
         steps:
             - 
                 name: Checkout code
-                uses: actions/checkout@v4
+                uses: actions/checkout@v6
 
             - 
                 name: Trigger Render deployment
@@ -108,7 +135,7 @@ jobs:
             - 
                 name: Notify Email (Success)
                 if: success()
-                uses: dawidd6/action-send-mail@v4
+                uses: dawidd6/action-send-mail@v7
                 with:
                     server_address: ${{ secrets.SMTP_SERVER }}
                     server_port: 587
@@ -126,12 +153,11 @@ jobs:
                         Branch: ${{ github.ref }}
                         Commit: ${{ github.sha }}
                         Action: Déploiement standard
-                        Healthcheck: OK ✅
 
             - 
                 name: Notify Email (Failure)
                 if: failure()
-                uses: dawidd6/action-send-mail@v4
+                uses: dawidd6/action-send-mail@v7
                 with:
                     server_address: ${{ secrets.SMTP_SERVER }}
                     server_port: 587
