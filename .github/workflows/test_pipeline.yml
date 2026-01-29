@@ -57,7 +57,16 @@ jobs:
       - name: Run tests inside Docker and extract token
         id: auth
         run: |
-            docker run --rm --network zap-net -e API_URL=$DOCKER_API_URL dev-sec-ops/api-rest-crud pytest tests/auth_flow.py -s
+            TOKEN=$(docker run --rm \
+            --network zap-net \
+            -e SQLALCHEMY_DATABASE_URL="sqlite:////usr/src/app/test.db" \
+            -e SECRET_KEY="${{ steps.generate_secret.outputs.SECRET_KEY }}" \
+            -e API_URL=$DOCKER_API_URL \
+            dev-sec-ops/api-rest-crud \
+            pytest tests/auth_flow.py -s \
+            | grep "ADMIN_TOKEN=" | cut -d= -f2)
 
-    #   - name: Display token
-    #     run: echo "The admin token is ${{ steps.auth.outputs.token }}"
+            echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Display token
+        run: echo "The admin token is ${{ steps.auth.outputs.token }}"
