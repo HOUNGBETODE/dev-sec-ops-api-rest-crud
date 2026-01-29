@@ -1,0 +1,56 @@
+name: CI Test & Security Scan
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test-and-scan:
+    runs-on: ubuntu-latest
+    env:
+      API_URL: http://api:80
+
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.14'
+
+      - name: Build Docker image
+        run: docker build -t dev-sec-ops/api-rest-crud .
+
+      - name: Create Docker network
+        run: docker network create zap-net || true
+
+      - name: Run API container
+        run: docker run -d --name api --network zap-net -p 8080:80 dev-sec-ops/api-rest-crud
+
+      - name: Wait for API to be ready
+        run: |
+          echo "Waiting for API to be ready..."
+          for i in {1..30}; do
+            if curl -f $API_URL/health; then
+              echo "API is up!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "API failed to start in time"
+          exit 1
+
+      - name: Install test dependencies
+        run: pip install pytest requests
+
+      - name: Run pytest to create admin & get token
+        id: auth
+        run: |
+          pytest tests/test_auth_flow.py -s
+     
+      - name: Display token
+        run: echo "The admin token is ${{ steps.auth.outputs.token }}"
