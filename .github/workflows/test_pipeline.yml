@@ -57,6 +57,9 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest requests
 
+      - name: List  files
+        run: ls -la
+
       - name: Run pytest to create admin & get token
         id: auth
         run: |
