@@ -21,6 +21,11 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: '3.14'
+    
+      - name: Generate SECRET_KEY
+        id: generate_secret
+        run: |
+            echo "SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" >> $GITHUB_OUTPUT
 
       - name: Build Docker image
         run: docker build -t dev-sec-ops/api-rest-crud .
@@ -29,7 +34,11 @@ jobs:
         run: docker network create zap-net || true
 
       - name: Run API container
-        run: docker run -d --name api --network zap-net -p 8080:80 dev-sec-ops/api-rest-crud
+        run: |
+            docker run -d --name api --network zap-net -p 8080:80 \
+                -e SQLALCHEMY_DATABASE_URL="sqlite:////usr/src/app/test.db" \
+                -e SECRET_KEY="${{ steps.generate_secret.outputs.SECRET_KEY }}" \
+                dev-sec-ops/api-rest-crud
 
       - name: Wait for API to be ready
         run: |
