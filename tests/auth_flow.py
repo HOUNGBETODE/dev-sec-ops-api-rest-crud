@@ -56,6 +56,5 @@ def test_login_and_get_token(create_admin_user):
     assert token
 
 
-    if "GITHUB_OUTPUT" in os.environ:
-        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-            f.write(f"token={token}\n")
+    print(f"ADMIN_TOKEN={token}")
+
