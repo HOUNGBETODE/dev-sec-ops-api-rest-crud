@@ -48,7 +48,8 @@ def test_login_and_get_token(create_admin_user):
             "username": creds["username"],
             "password": creds["password"]
         },
-        headers={"Content-Type": "application/x-www-form-urlencoded"}
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=5
     )
 
     assert response.status_code == 200
