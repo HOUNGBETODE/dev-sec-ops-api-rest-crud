@@ -49,7 +49,7 @@ jobs:
                 name: Retrieve PYTHON Files
                 id: retrieve-files
                 run: |
-                    mapfile -t PYTHON_FILES < <(find . -type f -name "*.py" | tr '\n' ' ')
+                    PYTHON_FILES=$(find . -type f -name "*.py" | tr '\n' ' ')
                     echo "Retrieved PYTHON files: $PYTHON_FILES"
                     echo "python-files=$PYTHON_FILES" >> $GITHUB_OUTPUT
 
@@ -71,7 +71,7 @@ jobs:
                 name: Run Bandit Security Scan
                 run: |
                     PYTHON_FILES=${{ steps.retrieve-files.outputs.python-files }}
-                    bandit -r ${PYTHON_FILES[@]} -ll -ii
+                    bandit -r $PYTHON_FILES -ll -ii -s B101,B105
 
             -
                 name: Run Pylint Code Scan

@@ -2,13 +2,13 @@
 name: Automate DAST (Dynamic Application Security Testing)
 
 on:
-    # push:
-    #     branches:
-    #         - '**'
-    # pull_request:
-    #     branches:
-    #         - main
-    # workflow_dispatch:
+    push:
+        branches:
+            - '**'
+    pull_request:
+        branches:
+            - main
+    workflow_dispatch:
     workflow_run:
         workflows: 
             - ci.yml
