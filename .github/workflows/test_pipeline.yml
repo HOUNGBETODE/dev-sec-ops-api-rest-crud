@@ -10,7 +10,7 @@ jobs:
   test-and-scan:
     runs-on: ubuntu-latest
     env:
-      API_URL: http://api:80
+      API_URL: http://localhost:8080
 
     
     steps:
@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "Waiting for API to be ready..."
           for i in {1..30}; do
-            if curl -f $API_URL/health; then
+            if curl -f $API_URL; then
               echo "API is up!"
               exit 0
             fi
