@@ -47,7 +47,7 @@ jobs:
                     fi
 
     check-security-scans:
-        nedds: check-branch-origin
+        needs: check-branch-origin
         runs-on: ubuntu-latest
         steps:
             - 
