@@ -42,6 +42,7 @@ jobs:
             sleep 2
           done
           echo "API failed to start in time"
+          docker logs api
           exit 1
 
       - name: Install test dependencies
