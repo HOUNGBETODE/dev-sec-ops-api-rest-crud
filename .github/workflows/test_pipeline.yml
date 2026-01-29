@@ -38,6 +38,7 @@ jobs:
             docker run -d --name api --network zap-net -p 8080:80 \
                 -e SQLALCHEMY_DATABASE_URL="sqlite:////usr/src/app/test.db" \
                 -e SECRET_KEY="${{ steps.generate_secret.outputs.SECRET_KEY }}" \
+                -e API_URL=$DOCKER_API_URL \
                 dev-sec-ops/api-rest-crud
 
       - name: Wait for API to be ready
@@ -56,14 +57,8 @@ jobs:
 
       - name: Run tests inside Docker and extract token
         id: auth
-        run: |
-            docker run --rm \
-            --network zap-net \
-            -e SQLALCHEMY_DATABASE_URL="sqlite:////usr/src/app/test.db" \
-            -e SECRET_KEY="${{ steps.generate_secret.outputs.SECRET_KEY }}" \
-            -e API_URL=$DOCKER_API_URL \
-            dev-sec-ops/api-rest-crud \
-            pytest tests/auth_flow.py -s
+        run: docker exec api pytest tests/auth_flow.py -s
 
     #   - name: Display token
     #     run: echo "The admin token is ${{ steps.auth.outputs.token }}"
+
