@@ -122,7 +122,7 @@ jobs:
 
             - 
                 name: Trigger Render deployment
-                uses: JorgeLNJunior/render-deploy@v1.4.7
+                uses: JorgeLNJunior/render-deploy@v1.5.0
                 with:
                     service_id: ${{ env.RENDER_SERVICE_ID }}
                     api_key: ${{ env.RENDER_API_KEY }}
