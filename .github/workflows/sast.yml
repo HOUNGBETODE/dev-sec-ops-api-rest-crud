@@ -72,7 +72,7 @@ jobs:
 
             # - 
             #     name: Upload Semgrep Report as Artifact
-            #     uses: actions/upload-artifact@v6
+            #     uses: actions/upload-artifact@v7
             #     with:
             #         name: semgrep-findings
             #         path: semgrep.sarif
@@ -95,7 +95,7 @@ jobs:
 
             - 
                 name: Upload Snyk Report as Artifact
-                uses: actions/upload-artifact@v6
+                uses: actions/upload-artifact@v7
                 with:
                     name: snyk-findings
                     path: snyk-report.sarif
