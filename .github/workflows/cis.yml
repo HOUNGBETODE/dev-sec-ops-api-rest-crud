@@ -67,7 +67,7 @@ jobs:
             
             - 
                 name: Upload Trivy Report as Artifact
-                uses: actions/upload-artifact@v6
+                uses: actions/upload-artifact@v7
                 with:
                     name: trivy-findings
                     path: |
@@ -96,7 +96,7 @@ jobs:
             
             - 
                 name: Upload Docker Scout Report as Artifact
-                uses: actions/upload-artifact@v6
+                uses: actions/upload-artifact@v7
                 with:
                     name: docker-scout-findings
                     path: |
